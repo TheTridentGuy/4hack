@@ -1,0 +1,53 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqllite"
+}
+
+generator db {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+model Board {
+  board_id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  public     Boolean  @default(true)
+  name       String
+  desc       String?
+  messages    Message[]
+  allow_anon Boolean  @default(false)
+  read_users User[]?
+  write_users User[]?
+  read_roles Role[]   @default([USER])
+  write_roles Role[]  @default([USER, ADMIN, SUPERADMIN])
+}
+
+model Message {
+  msg_id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  text       String
+  user       User     @relation(fields: [sender_id], references: [user_id])
+  sender_id     String
+  board       Board    @relation(fields: [board_id], references: [board_id])
+  board_id      String
+}
+
+model User {
+  user_id           String    @id @default(cuid())
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  username         String
+  display_name String
+  bio          String?
+  messages      Message[]
+  role         Role      @default(USER)
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPERADMIN
+}
