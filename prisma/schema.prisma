@@ -13,13 +13,12 @@ model Board {
   board_id         String   @id @default(cuid())
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
-  public     Boolean  @default(true)
+  private    Boolean  @default(false)
+  private_users User[]   @relation("private_boards")
   name       String
   desc       String?
   messages    Message[]
   allow_anon Boolean  @default(false)
-  read_users User[]?
-  write_users User[]?
   read_roles Role[]   @default([USER])
   write_roles Role[]  @default([USER, ADMIN, SUPERADMIN])
 }
@@ -44,6 +43,7 @@ model User {
   bio          String?
   messages      Message[]
   role         Role      @default(USER)
+  private_boards Board[] @relation("private_boards")
 }
 
 enum Role {
