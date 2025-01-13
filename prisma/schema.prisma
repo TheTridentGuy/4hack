@@ -1,6 +1,6 @@
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqllite"
+  provider = "postgresql"
+  url      = "postgresql://postgres:password@localhost:5432/postgres"
 }
 
 generator db {
@@ -10,44 +10,45 @@ generator db {
 }
 
 model Board {
-  board_id         String   @id @default(cuid())
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  private    Boolean  @default(false)
-  private_users User[]   @relation("private_boards")
-  name       String
-  desc       String?
-  messages    Message[]
-  allow_anon Boolean  @default(false)
-  read_roles Role[]   @default([USER])
-  write_roles Role[]  @default([USER, ADMIN, SUPERADMIN])
+  board_id        String    @id @default(cuid())
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  private         Boolean   @default(false)
+  private_members User[]    @relation("private_boards")
+  name            String
+  desc            String?
+  messages        Message[]
+  allow_anon      Boolean   @default(false)
+  read_roles      Role[]    @default([USER, MODERATOR, ADMIN])
+  write_roles     Role[]    @default([USER, MODERATOR, ADMIN])
 }
 
 model Message {
-  msg_id         String   @id @default(cuid())
+  msg_id     String   @id @default(cuid())
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   text       String
   user       User     @relation(fields: [sender_id], references: [user_id])
-  sender_id     String
-  board       Board    @relation(fields: [board_id], references: [board_id])
-  board_id      String
+  sender_id  String
+  board      Board    @relation(fields: [board_id], references: [board_id])
+  board_id   String
 }
 
 model User {
-  user_id           String    @id @default(cuid())
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-  username         String
-  display_name String
-  bio          String?
-  messages      Message[]
-  role         Role      @default(USER)
-  private_boards Board[] @relation("private_boards")
+  user_id        String    @id @default(cuid())
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  username       String
+  pass_hash     String
+  display_name   String
+  bio            String?
+  messages       Message[]
+  role           Role      @default(USER)
+  private_boards Board[]   @relation("private_boards")
 }
 
 enum Role {
   USER
+  MODERATOR
   ADMIN
-  SUPERADMIN
 }
