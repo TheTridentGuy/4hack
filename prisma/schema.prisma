@@ -5,7 +5,7 @@ datasource db {
 
 generator db {
   provider             = "prisma-client-py"
-  interface            = "asyncio"
+  interface            = "sync"
   recursive_type_depth = 5
 }
 
@@ -39,12 +39,20 @@ model User {
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
   username       String
-  pass_hash     String
+  pass_hash      String
   display_name   String
   bio            String?
   messages       Message[]
   role           Role      @default(USER)
   private_boards Board[]   @relation("private_boards")
+  sessions       Session[]
+}
+
+model Session {
+  session_id String   @unique
+  expires    DateTime
+  user       User     @relation(fields: [user_id], references: [user_id])
+  user_id    String
 }
 
 enum Role {

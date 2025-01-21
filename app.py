@@ -1,28 +1,26 @@
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from flask import Flask, request, render_template, redirect, session
 from prisma import Prisma
-import uvicorn
-import fastapi
+import flask
+import secrets
+import hashlib
+import flask_login
+import datetime
 
 
 from config import HOST, PORT, DEBUG, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASS_HASH
 
 
-# Lifespan events for FastAPI
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await startup()
-    yield
-    await shutdown()
+app = Flask(__name__)
+app.secret_key = secrets.token_hex(32)
+login_manager = flask_login.LoginManager()
+login_manager.init_app(app)
+db = Prisma()
+db.connect()
 
-async def startup():
-    await db.connect()
-    admins = await db.user.find_many(where={"role": "ADMIN"})
-    if not admins:
-        await db.user.create(data={
+
+admins =  db.user.find_many(where={"role": "ADMIN"})
+if not admins:
+    db.user.create(data={
         "username": DEFAULT_ADMIN_USERNAME,
         "pass_hash": DEFAULT_ADMIN_PASS_HASH,
         "role": "ADMIN",
@@ -30,28 +28,35 @@ async def startup():
         "bio": "Default admin user"
     })
 
-async def shutdown():
-    await db.disconnect()
 
-# Setup FastAPI app, Jinja2 templates, static files, and Prisma client
-app = FastAPI(lifespan=lifespan)
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-db = Prisma()
+def verify_session(user_id, session_id):
+    if user_id and session_id:
+        session_obj = db.session.find_first(where={"user_id": user_id, "session_id": session_id})
+        if datetime.datetime.now() < session_obj.expires:
+            return user_id
+    return None
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-# App routes
-@app.get("/", response_class=HTMLResponse)
-async def index(request: fastapi.Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.route("/client")
+def client():
+    return render_template("client.html")
 
-@app.get("/client", response_class=HTMLResponse)
-async def client(request: fastapi.Request):
-    return templates.TemplateResponse("client.html", {"request": request})
-
-@app.get("/login", response_class=HTMLResponse)
-async def login(request: fastapi.Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+@app.route("/auth/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.values.get("username")
+        password = request.values.get("password")
+        print(username, password)
+        if username and password:
+            # TODO: update hash algorithm
+            user = db.user.find_first(where={"username": username, "pass_hash": hashlib.sha256(password.encode()).hexdigest()})
+            if user:
+                return redirect("/client")
+            return "Invalid credentials"
+    return render_template("login.html")
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host=HOST, port=PORT, reload=DEBUG)
+    app.run(host=HOST, port=PORT, debug=DEBUG)
