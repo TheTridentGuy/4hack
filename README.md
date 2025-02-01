@@ -1,4 +1,4 @@
-# 4hack
+# 4hack - simple message/image board for hackclubbers
 ## **So WIP that I don't even have a demo, but it's better than tic-tac-toe**
 ## Current features:
  - Login system and user mangment
