@@ -3,17 +3,14 @@ from prisma import Prisma
 import flask
 import secrets
 import hashlib
-import flask_login
 import datetime
 
 
-from config import HOST, PORT, DEBUG, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASS_HASH
+from config import HOST, PORT, DEBUG, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASS_HASH, DEFAULT_BOARD_NAME, DEFAULT_BOARD_DESC
 
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
-login_manager = flask_login.LoginManager()
-login_manager.init_app(app)
 db = Prisma()
 db.connect()
 
@@ -27,21 +24,33 @@ if not admins:
         "display_name": "Admin",
         "bio": "Default admin user"
     })
+boards = db.board.find_first()
+if not boards:
+    db.board.create(data={
+        "name": DEFAULT_BOARD_NAME,
+        "desc": DEFAULT_BOARD_DESC
+    })
 
 
 def verify_session(user_id, session_id):
     if user_id and session_id:
         session_obj = db.session.find_first(where={"user_id": user_id, "session_id": session_id})
-        if datetime.datetime.now() < session_obj.expires:
+        if datetime.datetime.now().astimezone(datetime.timezone.utc) < session_obj.expires:
             return user_id
     return None
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/client")
 def client():
-    return render_template("client.html")
+    if verify_session(session.get("user_id"), session.get("session_id")):
+        boards = db.board.find_many(where={"private": False})
+        boards_list = [(board.board_id, board.name) for board in boards]
+        return render_template("client.html", boards=boards_list)
+    else:
+        return redirect("/auth/login")
 
 @app.route("/auth/login", methods=["GET", "POST"])
 def login():
@@ -52,6 +61,9 @@ def login():
         if username and password:
             # TODO: update hash algorithm
             user = db.user.find_first(where={"username": username, "pass_hash": hashlib.sha256(password.encode()).hexdigest()})
+            session_obj = db.session.create(data={"user_id": user.user_id, "expires": datetime.datetime.now().astimezone(datetime.timezone.utc) + datetime.timedelta(days=1), "session_id": secrets.token_hex(32)})
+            session["user_id"] = user.user_id
+            session["session_id"] = session_obj.session_id
             if user:
                 return redirect("/client")
             return "Invalid credentials"
